@@ -320,9 +320,16 @@ db.getCollection("invoices").aggregate([
     $group: {
       _id: "$_id.store_id",
       store_avg_revenue: { $avg: "$total_revenue" },
-      best_employee_id: { $first: "$_id.employee_id" },
-      best_employee_revenue: { $max: "$total_revenue" },
-      best_employee_invoices: { $first: "$total_invoices" }
+      best_employee: {
+        $top: {
+          sortBy: { total_revenue: -1 },
+          output: {
+            employee_id: "$_id.employee_id",
+            total_revenue: "$total_revenue",
+            total_invoices: "$total_invoices"
+          }
+        }
+      }
     }
   },
   {
@@ -330,16 +337,16 @@ db.getCollection("invoices").aggregate([
       _id: 0,
       store_id: "$_id",
       store_avg_revenue: { $round: ["$store_avg_revenue", 2] },
-      best_employee_id: 1,
-      best_employee_revenue: { $round: ["$best_employee_revenue", 2] },
-      best_employee_invoices: 1,
+      best_employee_id: "$best_employee.employee_id",
+      best_employee_revenue: { $round: ["$best_employee.total_revenue", 2] },
+      best_employee_invoices: "$best_employee.total_invoices",
       percent_above_avg: {
         $round: [
           {
             $multiply: [
               {
                 $divide: [
-                  { $subtract: ["$best_employee_revenue", "$store_avg_revenue"] },
+                  { $subtract: ["$best_employee.total_revenue", "$store_avg_revenue"] },
                   "$store_avg_revenue"
                 ]
               },
