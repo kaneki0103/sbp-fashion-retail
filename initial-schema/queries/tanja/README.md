@@ -191,3 +191,194 @@ db.getCollection("invoices").aggregate([
 ![Rezultat upita3](3.query.png) 
 
 *Prosecno vreme izvrsavanja: 4.36s*  
+
+### Upit 4: Prikazati koji gradovi pokazuju pad prihoda u Q4 (oktobar, novembar, decembar) u 2024. godini u odnosu na isti period 2023.
+
+```javascript
+db.getCollection("invoices").aggregate([
+  {
+    $match: {
+      transaction_type: "Sale",
+      $expr: {
+        $in: [
+          { $month: { $dateFromString: { dateString: "$date" } } },
+          [10, 11, 12]
+        ]
+      }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        city: "$customer.city",
+        year: { $year: { $dateFromString: { dateString: "$date" } } },
+        month: { $month: { $dateFromString: { dateString: "$date" } } }
+      },
+      monthly_revenue: { $sum: "$invoice_total" }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        city: "$_id.city",
+        month: "$_id.month"
+      },
+      yearly_data: {
+        $push: {
+          year: "$_id.year",
+          revenue: "$monthly_revenue"
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      city: "$_id.city",
+      month: "$_id.month",
+      revenue_2023: {
+        $sum: {
+          $map: {
+            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2023] } } },
+            as: "d",
+            in: "$$d.revenue"
+          }
+        }
+      },
+      revenue_2024: {
+        $sum: {
+          $map: {
+            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2024] } } },
+            as: "d",
+            in: "$$d.revenue"
+          }
+        }
+      }
+    }
+  },
+  {
+    $match: {
+      revenue_2023: { $gt: 0 },
+      revenue_2024: { $gt: 0 }
+    }
+  },
+  {
+    $project: {
+      city: 1,
+      month: 1,
+      revenue_2023: { $round: ["$revenue_2023", 2] },
+      revenue_2024: { $round: ["$revenue_2024", 2] },
+      change_percent: {
+        $round: [
+          {
+            $multiply: [
+              { $divide: [{ $subtract: ["$revenue_2024", "$revenue_2023"] }, "$revenue_2023"] },
+              100
+            ]
+          },
+          2
+        ]
+      }
+    }
+  },
+  {
+    $match: {
+      change_percent: { $lt: 0 }
+    }
+  },
+  {
+    $sort: { change_percent: 1 }
+  }
+])
+```
+
+**Rezultat upita:**
+![Rezultat upita4](4.query.png) 
+
+*Prosecno vreme izvrsavanja: 14.04s*  
+
+### Upit 5: Pronaći najboljeg radnika u svakoj prodavnici, koliko je zaradio i za koliko procenata je bolji od proseka prodavnice.
+
+```javascript
+db.getCollection("invoices").aggregate([
+  {
+    $match: {
+      transaction_type: "Sale"
+    }
+  },
+  {
+    $group: {
+      _id: {
+        employee_id: "$employee_id",
+        store_id: "$store_id"
+      },
+      total_revenue: { $sum: "$invoice_total" },
+      total_invoices: { $sum: 1 }
+    }
+  },
+  {
+    $group: {
+      _id: "$_id.store_id",
+      store_avg_revenue: { $avg: "$total_revenue" },
+      best_employee_id: { $first: "$_id.employee_id" },
+      best_employee_revenue: { $max: "$total_revenue" },
+      best_employee_invoices: { $first: "$total_invoices" }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      store_id: "$_id",
+      store_avg_revenue: { $round: ["$store_avg_revenue", 2] },
+      best_employee_id: 1,
+      best_employee_revenue: { $round: ["$best_employee_revenue", 2] },
+      best_employee_invoices: 1,
+      percent_above_avg: {
+        $round: [
+          {
+            $multiply: [
+              {
+                $divide: [
+                  { $subtract: ["$best_employee_revenue", "$store_avg_revenue"] },
+                  "$store_avg_revenue"
+                ]
+              },
+              100
+            ]
+          },
+          2
+        ]
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "stores",
+      localField: "store_id",
+      foreignField: "_id",
+      as: "store_info"
+    }
+  },
+  {
+    $project: {
+      store_id: 1,
+      store_name: { $arrayElemAt: ["$store_info.store_name", 0] },
+      city: { $arrayElemAt: ["$store_info.city", 0] },
+      country: { $arrayElemAt: ["$store_info.country", 0] },
+      best_employee_id: 1,
+      best_employee_revenue: 1,
+      best_employee_invoices: 1,
+      store_avg_revenue: 1,
+      percent_above_avg: 1
+    }
+  },
+  {
+    $sort: { percent_above_avg: -1 }
+  }
+])
+```
+
+**Rezultat upita:**
+![Rezultat upita5](5.query.png) 
+
+*Prosecno vreme izvrsavanja: 5.61s*  
