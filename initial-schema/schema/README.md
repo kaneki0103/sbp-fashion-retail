@@ -2,7 +2,7 @@
 
 ## Inicijalna sema baze podataka se sastoji se iz 2 kolekcije:
 
-![Intial shema](intial.png)
+![Intial shema](initial.png)
 
 1. **Kolekcija invoices** sadrži podatke o transakcijama.
 
