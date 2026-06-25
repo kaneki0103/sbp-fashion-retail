@@ -12,7 +12,7 @@ MONGO_URI = "mongodb://localhost:27017/"
 DB_NAME = "fashion_retail_db"
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data")
 
-CHUNK_SIZE = 100_000  # broj redova po chunk-u (transactions.csv je veliki)
+CHUNK_SIZE = 100_000  # broj redova po chunk-u 
 
 
 # ─────────────────────────────────────────────
