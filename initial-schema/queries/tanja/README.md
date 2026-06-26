@@ -1,4 +1,4 @@
-### Upiti - Menadzer prodaje
+# Upiti - Menadzer prodaje
 
 ### Upit 1: Prodavnice rangirane po prosečnoj vrednosti fakture, sa poređenjem sa globalnim prosekom. Koje prodavnice su iznad/ispod globalnog proseka prosečne fakture, i za koliko?
 
