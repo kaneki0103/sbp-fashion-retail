@@ -1,6 +1,6 @@
-// UPIT 1 
-// za svaku zemlju, izlistati subkategoriju proizvoda koja je donela najveci ukupni prihod
-// i koliki je njen udeo u ukupnom prihodu te zemlje
+# UPITI
+
+### UPIT 1: za svaku zemlju, izlistati subkategoriju proizvoda koja je donela najveci ukupni prihod i koliki je njen udeo u ukupnom prihodu te zemlje
 
 ```javascript
 db.getCollection("invoices").aggregate(
@@ -71,13 +71,12 @@ db.getCollection("invoices").aggregate(
     ],
     { allowDiskUse: true }
 )
+```
 
 
+### UPIT 2: za svaku starosnu grupu (18-25, 26-35, 36-45, 46+) i pol izracunati prosecnu potrosnju po transakciji i uporediti sa globalnim prosekom
 
-// UPIT 2
-// za svaku starosnu grupu (18-25, 26-35, 36-45, 46+) i pol,
-// izracunati prosecnu potrosnju po transakciji i uporediti sa globalnim prosekom
-
+```javascript
 db.getCollection("invoices").aggregate(
     [
         {
@@ -182,13 +181,12 @@ db.getCollection("invoices").aggregate(
     ],
     { allowDiskUse: true }
 )
+```
 
 
+### UPIT 3: pronaci top 10% kupaca po ukupnoj potrosnji i ispisati koliki procenat ukupnog prihoda cine kao i koja kategorija proizvoda dominira u njihovim kupovinama
 
-// UPIT 3
-// pronaci top 10% kupaca po ukupnoj potrosnji i ispisati koliki procenat ukupnog prihoda cine
-// kao i koja kategorija proizvoda dominira u njihovim kupovinama
-
+```javascript
 db.getCollection("invoices").aggregate(
     [
         { $match: { transaction_type: "Sale" } },
@@ -291,12 +289,11 @@ db.getCollection("invoices").aggregate(
     ],
     { allowDiskUse: true }
 )
+```
 
+### UPIT 4: za svaki pol, pronaci top 3 velicine proizvoda po broju prodatih komada, sa procentualnim udelom u ukupnim kupovinama tog pola
 
-// UPIT 4
-// za svaki pol, pronaci top 3 velicine proizvoda
-// po broju prodatih komada, sa procentualnim udelom u ukupnim kupovinama tog pola
-
+```javascript
 db.getCollection("invoices").aggregate(
     [
         {
@@ -371,12 +368,11 @@ db.getCollection("invoices").aggregate(
     ],
     { allowDiskUse: true }
 )
+```
 
+### UPIT 5: pronaci top 5 najprodavanijih proizvoda globalno po prihodu za svaki proizvod prikazati prihod po drzavi i da li se nalazi u top 5 u tom drzavi
 
-// UPIT 5
-// pronaci top 5 najprodavanijih proizvoda globalno po prihodu
-// za svaki proizvod prikazati prihod po drzavi i da li se nalazi u top 5 u tom drzavi
-
+```javascript 
 db.getCollection("invoices").aggregate(
     [
         {
@@ -443,3 +439,4 @@ db.getCollection("invoices").aggregate(
     ],
     { allowDiskUse: true }
 )
+```
