@@ -4,11 +4,11 @@
 
 ![Intial shema](initial.png)
 
-1. **Kolekcija invoices** sadrži podatke o transakcijama.
+1. **Kolekcija invoices** sadrzi podatke o transakcijama.
 
 ![Invoices shema](invoices.png)
 
-2. **Kolekcija stores** sadrži podatke o prodavnicama.
+2. **Kolekcija stores** sadrzi podatke o prodavnicama.
 
 ![Stores shema](stores.png)
 
