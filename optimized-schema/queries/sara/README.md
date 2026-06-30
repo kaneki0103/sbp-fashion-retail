@@ -52,7 +52,7 @@ db.invoice_lines_denorm.aggregate(
 
 ### Rezultat upita:
 
-![](query.png)
+![](qurey1.png)
 
 
 ***Vreme izvrsavanja:*** 12.9s
@@ -154,7 +154,7 @@ db.invoice_lines_denorm.aggregate(
 
 ### Rezultat upita:
 
-![](upit1.png)
+![](query2.png)
 
 
 ***Vreme izvrsavanja:*** 3:44 minuta
