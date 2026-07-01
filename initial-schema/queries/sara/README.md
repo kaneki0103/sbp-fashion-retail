@@ -178,116 +178,82 @@ db.getCollection("invoices").aggregate(
 
 
 
-### UPIT 3: pronaci top 10% kupaca po ukupnoj potrosnji i ispisati koliki procenat ukupnog prihoda cine kao i koja kategorija proizvoda dominira u njihovim kupovinama
+### UPIT 3: za svaku kategoriju proizvoda pronaci 3 najprodavanije boje po prihodu i koliki je njihov udeo u ukupnom prihodu te kategorije
 
 ```javascript
 db.getCollection("invoices").aggregate(
     [
         { $match: { transaction_type: "Sale" } },
 
-        // grupisemo po kupcu
+        { $unwind: "$lines" },
+
+        {
+            $match: {
+                "lines.color": { $exists: true, $ne: null, $not: /^NaN$/, $type: "string" }
+            }
+        },
+
         {
             $group: {
-                _id: "$customer.customer_id",
-                customer_name: { $first: "$customer.name" },
-                customer_country: { $first: "$customer.country" },
-                total_spend: { $sum: "$invoice_total" },
-                num_invoices: { $sum: 1 }
+                _id: {
+                    category: "$lines.category",
+                    color: "$lines.color"
+                },
+                revenue: { $sum: "$lines.line_total" },
+                quantity: { $sum: "$lines.quantity" }
             }
         },
-        { $sort: { total_spend: -1 } },
-
-        // facet - paralelno racunamo ukupan prihod i rangiramo kupce
         {
-            $facet: {
-                stats: [
-                    {
-                        $group: {
-                            _id: null,
-                            grand_total: { $sum: "$total_spend" },
-                            total_customers: { $sum: 1 }
-                        }
+            $sort: {
+                "_id.category": 1,
+                revenue: -1
+            }
+        },
+        {
+            $group: {
+                _id: "$_id.category",
+                total_category_revenue: { $sum: "$revenue" },
+                colors: {
+                    $push: {
+                        color: "$_id.color",
+                        revenue: "$revenue",
+                        quantity: "$quantity"
                     }
-                ],
-                top_customers: [
-                    { $limit: 128370 },
-                    {
-                        $group: {
-                            _id: null,
-                            top_revenue: { $sum: "$total_spend" },
-                            top_count: { $sum: 1 },
-                            top_ids: { $push: "$_id" }
-                        }
-                    }
-                ]
+                }
             }
         },
-
-        // spajamo stats i top_customers
-        {
-            $project: {
-                grand_total: { $arrayElemAt: ["$stats.grand_total", 0] },
-                total_customers: { $arrayElemAt: ["$stats.total_customers", 0] },
-                top_revenue: { $arrayElemAt: ["$top_customers.top_revenue", 0] },
-                top_count: { $arrayElemAt: ["$top_customers.top_count", 0] },
-                top_ids: { $arrayElemAt: ["$top_customers.top_ids", 0] }
-            }
-        },
-
-        // lookup - dominantna kategorija kod top kupaca
-        {
-            $lookup: {
-                from: "invoices",
-                let: { top_ids: "$top_ids" },
-                pipeline: [
-                    {
-                        $match: {
-                            $expr: {
-                                $and: [
-                                    { $in: ["$customer.customer_id", "$$top_ids"] },
-                                    { $eq: ["$transaction_type", "Sale"] }
-                                ]
-                            }
-                        }
-                    },
-                    { $unwind: "$lines" },
-                    {
-                        $group: {
-                            _id: "$lines.category",
-                            category_revenue: { $sum: "$lines.line_total" }
-                        }
-                    },
-                    { $sort: { category_revenue: -1 } },
-                    { $limit: 3 }
-                ],
-                as: "top_categories"
-            }
-        },
-
         {
             $project: {
                 _id: 0,
-                total_customers: 1,
-                top_10_pct_count: "$top_count",
-                grand_total: { $round: ["$grand_total", 2] },
-                top_10_pct_revenue: { $round: ["$top_revenue", 2] },
+                category: "$_id",
+                total_category_revenue: { $round: ["$total_category_revenue", 2] },
+                top3_colors: { $slice: ["$colors", 3] }
+            }
+        },
+        { $unwind: "$top3_colors" },
+        {
+            $project: {
+                category: 1,
+                color: "$top3_colors.color",
+                revenue: { $round: ["$top3_colors.revenue", 2] },
+                quantity: "$top3_colors.quantity",
                 revenue_share_pct: {
                     $round: [
-                        { $multiply: [{ $divide: ["$top_revenue", "$grand_total"] }, 100] },
+                        { $multiply: [{ $divide: ["$top3_colors.revenue", "$total_category_revenue"] }, 100] },
                         2
                     ]
-                },
-                top_categories: 1
+                }
             }
-        }
+        },
+        { $sort: { category: 1, revenue: -1 } }
     ],
     { allowDiskUse: true }
 )
 ```
-![](query3.png)
+![](q3v2.png)
 
 
-***Vreme izvrsavanja:*** 36min
+***Vreme izvrsavanja:*** 1.5 min
 
 
 ### UPIT 4: za svaki pol, pronaci top 3 velicine proizvoda po broju prodatih komada, sa procentualnim udelom u ukupnim kupovinama tog pola
