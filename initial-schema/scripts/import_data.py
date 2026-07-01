@@ -23,18 +23,18 @@ def connect_to_mongo(uri):
     try:
         client = MongoClient(uri)
         client.admin.command("ping")
-        print("MongoDB konekcija uspešna.\n")
+        print("MongoDB konekcija uspesna.\n")
         return client
     except ConnectionFailure as e:
-        print(f"Greška pri povezivanju: {e}")
+        print(f"Greska pri povezivanju: {e}")
         return None
 
 
 # ─────────────────────────────────────────────
-# UČITAVANJE LOOKUP TABELA U MEMORIJU
+# UcITAVANJE LOOKUP TABELA U MEMORIJU
 # ─────────────────────────────────────────────
 def load_lookup_data(path):
-    print("Učitavanje lookup tabela (customers, products, stores, employees, discounts)...")
+    print("Ucitavanje lookup tabela (customers, products, stores, employees, discounts)...")
 
     # NOVO:
     customers_df = pd.read_csv(os.path.join(path, "customers.csv"), dtype={"Telephone": str})
@@ -98,12 +98,12 @@ def load_lookup_data(path):
         for _, row in employees_df.iterrows()
     }
 
-    print("Lookup tabele uspešno učitane.\n")
+    print("Lookup tabele uspesno ucitane.\n")
     return customers_map, products_map, stores_map, employees_map
 
 
 # ─────────────────────────────────────────────
-# IMPORT STORES KOLEKCIJE (sa ugnježdenim zaposlenima)
+# IMPORT STORES KOLEKCIJE (sa ugnjezdenim zaposlenima)
 # ─────────────────────────────────────────────
 def import_stores(db, stores_map, employees_map):
     print("--- Obrada kolekcije: stores ---")
@@ -138,7 +138,7 @@ def import_stores(db, stores_map, employees_map):
         documents.append(doc)
 
     db["stores"].insert_many(documents)
-    print(f"Ubačeno {len(documents)} prodavnica u kolekciju 'stores'.\n")
+    print(f"Ubaceno {len(documents)} prodavnica u kolekciju 'stores'.\n")
 
 
 # ─────────────────────────────────────────────
@@ -146,7 +146,7 @@ def import_stores(db, stores_map, employees_map):
 # ─────────────────────────────────────────────
 def import_invoices(db, path, customers_map, products_map):
     print("--- Obrada kolekcije: invoices ---")
-    print("(transactions.csv je velik, čitamo ga u chunkovima...)\n")
+    print("(transactions.csv je velik, citamo ga u chunkovima...)\n")
 
     db["invoices"].delete_many({})
 
@@ -157,7 +157,7 @@ def import_invoices(db, path, customers_map, products_map):
 
     for chunk in pd.read_csv(transactions_path, chunksize=CHUNK_SIZE):
         chunk_num += 1
-        print(f"  Obrađujem chunk #{chunk_num} ({len(chunk)} redova)...")
+        print(f"  Obradjujem chunk #{chunk_num} ({len(chunk)} redova)...")
 
         # Grupisanje redova po Invoice ID -> jedan dokument po fakturi
         invoice_groups = {}
@@ -207,8 +207,8 @@ def import_invoices(db, path, customers_map, products_map):
             }
             invoice_groups[inv_id]["lines"].append(line)
 
-        # Ubacivanje obrađenog chunk-a u MongoDB
-        # Koristimo upsert jer ista faktura može biti raspoređena u više chunkova
+        # Ubacivanje obradjenog chunk-a u MongoDB
+        # Koristimo upsert jer ista faktura moze biti rasporedjena u vise chunkova
         if invoice_groups:
             from pymongo import UpdateOne
             operations = []
@@ -226,9 +226,9 @@ def import_invoices(db, path, customers_map, products_map):
                 )
             db["invoices"].bulk_write(operations, ordered=False)
             total_invoices += len(invoice_groups)
-            print(f"  Obrađeno {len(invoice_groups)} faktura. Ukupno do sad: {total_invoices}\n")
+            print(f"  Obradjeno {len(invoice_groups)} faktura. Ukupno do sad: {total_invoices}\n")
 
-    print(f"Kolekcija 'invoices' završena. Ukupno faktura: {total_invoices}\n")
+    print(f"Kolekcija 'invoices' zavrsena. Ukupno faktura: {total_invoices}\n")
 
 
 # ─────────────────────────────────────────────
@@ -247,7 +247,7 @@ def main():
     import_invoices(db, DATA_PATH, customers_map, products_map)
 
     print("=" * 50)
-    print("Svi podaci su uspešno importovani u MongoDB!")
+    print("Svi podaci su uspesno importovani u MongoDB!")
     print(f"Baza: {DB_NAME}")
     print(f"Kolekcije: invoices, stores")
     print("=" * 50)

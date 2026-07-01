@@ -1,6 +1,6 @@
 # Upiti - Menadzer prodaje
 
-### Upit 1: Prodavnice rangirane po prosečnoj vrednosti fakture, sa poređenjem sa globalnim prosekom. Koje prodavnice su iznad/ispod globalnog proseka prosečne fakture, i za koliko?
+### Upit 1: Prodavnice rangirane po prosecnoj vrednosti fakture, sa poredjenjem sa globalnim prosekom. Koje prodavnice su iznad/ispod globalnog proseka prosecne fakture, i za koliko?
 
 ```javascript
 db.getCollection("invoices").aggregate([
@@ -71,7 +71,7 @@ db.getCollection("invoices").aggregate([
 *Prosecno vreme izvrsavanja: 4.29s*  
 
 
-### Upit 2: Top 10% kupaca po potrošnji sa dominantnim načinom plaćanja. Identifikovati top 10% kupaca koji najviše troše i utvrditi koji način plaćanja dominira kod njih.
+### Upit 2: Top 10% kupaca po potrosnji sa dominantnim nacinom placanja. Identifikovati top 10% kupaca koji najvise trose i utvrditi koji nacin placanja dominira kod njih.
 
 ```javascript
 db.getCollection("invoices").aggregate([
@@ -125,7 +125,7 @@ db.getCollection("invoices").aggregate([
 
 *Prosecno vreme izvrsavanja: 62.33s*  
 
-### Upit 3: Identifikovati koje prodavnice imaju najviše problema sa vraćanjem robe i koja kategorija dominira u povraćajima.
+### Upit 3: Identifikovati koje prodavnice imaju najvise problema sa vracanjem robe i koja kategorija dominira u povracajima.
 
 ```javascript
 db.getCollection("invoices").aggregate([
@@ -297,7 +297,7 @@ db.getCollection("invoices").aggregate([
 
 *Prosecno vreme izvrsavanja: 14.04s*  
 
-### Upit 5: Pronaći najboljeg radnika u svakoj prodavnici, koliko je zaradio i za koliko procenata je bolji od proseka prodavnice.
+### Upit 5: Pronaci najboljeg radnika u svakoj prodavnici, koliko je zaradio i za koliko procenata je bolji od proseka prodavnice.
 
 ```javascript
 db.getCollection("invoices").aggregate([
