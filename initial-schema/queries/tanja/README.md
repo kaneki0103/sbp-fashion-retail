@@ -12,7 +12,6 @@ db.invoices.aggregate([
   },
   { $unwind: "$lines" },
 
-  // Normalizacija valute u USD pre agregacije (fiksne, priblizne kursne stope)
   {
     $addFields: {
       "lines.line_total_usd": {
@@ -97,93 +96,68 @@ db.invoices.aggregate([
 
 *Prosecno vreme izvrsavanja: 14.10s*  
 
-### Upit 2: Kojih 20 kupaca je u 2024. godini imali najveći rast potrošnje u odnosu na 2023?
+### Upit 2: Koji zaposleni su tokom 2024. godine ostvarili prihod iznad proseka zaposlenih u svojoj prodavnici, i za koliko?
 
 ```javascript
-db.getCollection("invoices").aggregate([
+db.invoices.aggregate([
   {
-    $match: { transaction_type: "Sale" }
-  },
-  {
-    $group: {
-      _id: {
-        customer_id: "$customer.customer_id",
-        year: { $year: { $dateFromString: { dateString: "$date" } } }
-      },
-      customer_name: { $first: "$customer.name" },
-      customer_city: { $first: "$customer.city" },
-      customer_country: { $first: "$customer.country" },
-      total_spent: { $sum: "$invoice_total" }
+    $match: {
+      transaction_type: "Sale",
+      $expr: { $eq: [{ $year: { $dateFromString: { dateString: "$date" } } }, 2024] }
     }
   },
   {
     $group: {
-      _id: "$_id.customer_id",
-      customer_name: { $first: "$customer_name" },
-      customer_city: { $first: "$customer_city" },
-      customer_country: { $first: "$customer_country" },
-      yearly_data: {
-        $push: { year: "$_id.year", total_spent: "$total_spent" }
-      }
+      _id: { store_id: "$store_id", employee_id: "$employee_id" },
+      employee_revenue: { $sum: "$invoice_total" },
+      total_invoices: { $sum: 1 }
     }
   },
   {
-    $project: {
-      customer_name: 1,
-      customer_city: 1,
-      customer_country: 1,
-      spent_2023: {
-        $sum: {
-          $map: {
-            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2023] } } },
-            as: "d", in: "$$d.total_spent"
-          }
-        }
-      },
-      spent_2024: {
-        $sum: {
-          $map: {
-            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2024] } } },
-            as: "d", in: "$$d.total_spent"
-          }
+    $group: {
+      _id: "$_id.store_id",
+      store_avg_revenue: { $avg: "$employee_revenue" },
+      employees: {
+        $push: {
+          employee_id: "$_id.employee_id",
+          employee_revenue: "$employee_revenue",
+          total_invoices: "$total_invoices"
         }
       }
     }
   },
+  { $unwind: "$employees" },
   {
-    $match: { spent_2023: { $gt: 0 }, spent_2024: { $gt: 0 } }
+    $lookup: {
+      from: "stores",
+      localField: "_id",
+      foreignField: "_id",
+      as: "store_info"
+    }
   },
   {
     $project: {
       _id: 0,
-      customer_id: "$_id",
-      customer_name: 1,
-      customer_city: 1,
-      customer_country: 1,
-      spent_2023: { $round: ["$spent_2023", 2] },
-      spent_2024: { $round: ["$spent_2024", 2] },
-      growth_percent: {
-        $round: [
-          {
-            $multiply: [
-              { $divide: [{ $subtract: ["$spent_2024", "$spent_2023"] }, "$spent_2023"] },
-              100
-            ]
-          }, 2
-        ]
+      store_id: "$_id",
+      store_name: { $arrayElemAt: ["$store_info.store_name", 0] },
+      employee_id: "$employees.employee_id",
+      employee_revenue: { $round: ["$employees.employee_revenue", 2] },
+      total_invoices: "$employees.total_invoices",
+      store_avg_revenue: { $round: ["$store_avg_revenue", 2] },
+      above_avg_by: {
+        $round: [{ $subtract: ["$employees.employee_revenue", "$store_avg_revenue"] }, 2]
       }
     }
   },
-  { $match: { growth_percent: { $gt: 0 } } },
-  { $sort: { growth_percent: -1 } },
-  { $limit: 20 }
+  { $match: { above_avg_by: { $gt: 0 } } },
+  { $sort: { above_avg_by: -1 } }
 ])
 ```
 
 **Rezultat upita:**
 ![Rezultat upita2](2.query.png)
 
-*Prosecno vreme izvrsavanja: 43.09s*  
+*Prosecno vreme izvrsavanja: 7.13s*  
 
 ### Upit 3: Identifikovati koje prodavnice imaju najvise problema sa vracanjem robe i koja kategorija dominira u povracajima.
 

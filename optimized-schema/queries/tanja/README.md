@@ -58,94 +58,57 @@ db.invoice_lines_menadzer.aggregate([
 
 *Prosecno vreme izvrsavanja: 4.66s*  
 
-### Upit 2: Kojih 20 kupaca je u 2024. godini imali najveći rast potrošnje u odnosu na 2023?
+### Upit 2: KKoji zaposleni su tokom 2024. godine ostvarili prihod iznad proseka zaposlenih u svojoj prodavnici, i za koliko?
 
 ```javascript
 db.invoice_lines_menadzer.aggregate([
+  { $match: { transaction_type: "Sale", year: 2024 } },
   {
-    $match: {
-      transaction_type: "Sale",
-      year: { $in: [2023, 2024] }
+    $group: {
+      _id: { store_id: "$store_id", employee_id: "$employee_id" },
+      store_name: { $first: "$store_name" },
+      employee_revenue: { $sum: "$line_total" },
+      invoice_ids: { $addToSet: "$invoice_id" }
     }
   },
   {
     $group: {
-      _id: {
-        customer_id: "$customer_id",
-        year: "$year"
-      },
-      customer_name: { $first: "$customer_name" },
-      customer_city: { $first: "$customer_city" },
-      customer_country: { $first: "$customer_country" },
-      total_spent: { $sum: "$line_total" }
-    }
-  },
-  {
-    $group: {
-      _id: "$_id.customer_id",
-      customer_name: { $first: "$customer_name" },
-      customer_city: { $first: "$customer_city" },
-      customer_country: { $first: "$customer_country" },
-      yearly_data: {
-        $push: { year: "$_id.year", total_spent: "$total_spent" }
-      }
-    }
-  },
-  {
-    $project: {
-      customer_name: 1,
-      customer_city: 1,
-      customer_country: 1,
-      spent_2023: {
-        $sum: {
-          $map: {
-            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2023] } } },
-            as: "d", in: "$$d.total_spent"
-          }
-        }
-      },
-      spent_2024: {
-        $sum: {
-          $map: {
-            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2024] } } },
-            as: "d", in: "$$d.total_spent"
-          }
+      _id: "$_id.store_id",
+      store_name: { $first: "$store_name" },
+      store_avg_revenue: { $avg: "$employee_revenue" },
+      employees: {
+        $push: {
+          employee_id: "$_id.employee_id",
+          employee_revenue: "$employee_revenue",
+          total_invoices: { $size: "$invoice_ids" }
         }
       }
     }
   },
-  { $match: { spent_2023: { $gt: 0 }, spent_2024: { $gt: 0 } } },
+  { $unwind: "$employees" },
   {
     $project: {
       _id: 0,
-      customer_id: "$_id",
-      customer_name: 1,
-      customer_city: 1,
-      customer_country: 1,
-      spent_2023: { $round: ["$spent_2023", 2] },
-      spent_2024: { $round: ["$spent_2024", 2] },
-      growth_percent: {
-        $round: [
-          {
-            $multiply: [
-              { $divide: [{ $subtract: ["$spent_2024", "$spent_2023"] }, "$spent_2023"] },
-              100
-            ]
-          }, 2
-        ]
+      store_id: "$_id",
+      store_name: 1,
+      employee_id: "$employees.employee_id",
+      employee_revenue: { $round: ["$employees.employee_revenue", 2] },
+      total_invoices: "$employees.total_invoices",
+      store_avg_revenue: { $round: ["$store_avg_revenue", 2] },
+      above_avg_by: {
+        $round: [{ $subtract: ["$employees.employee_revenue", "$store_avg_revenue"] }, 2]
       }
     }
   },
-  { $match: { growth_percent: { $gt: 0 } } },
-  { $sort: { growth_percent: -1 } },
-  { $limit: 20 }
+  { $match: { above_avg_by: { $gt: 0 } } },
+  { $sort: { above_avg_by: -1 } }
 ])
 ```
 
 **Rezultat upita:**
 ![Rezultat upita2](2.query.png)
 
-*Prosecno vreme izvrsavanja: 34.10s*  
+*Prosecno vreme izvrsavanja: 4.3s*  
 
 ### Upit 3: Identifikovati koje prodavnice imaju najvise problema sa vracanjem robe i koja kategorija dominira u povracajima.
 
