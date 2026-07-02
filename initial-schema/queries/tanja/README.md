@@ -1,94 +1,120 @@
 # Upiti - Menadzer prodaje
 
-### Upit 1: Prodavnice rangirane po prosecnoj vrednosti fakture, sa poredjenjem sa globalnim prosekom. Koje prodavnice su iznad/ispod globalnog proseka prosecne fakture, i za koliko?
+### Upit 1: Koje prodavnice su ostvarile najveći prihod u 2024. godini i koliko odstupaju od proseka prodavnica koje su te godine imale prodaju?
 
 ```javascript
-db.getCollection("invoices").aggregate([
+db.invoices.aggregate([
   {
-    $group: {
-      _id: "$store_id",
-      avg_invoice: { $avg: "$invoice_total" }
+    $match: {
+      transaction_type: "Sale",
+      $expr: { $eq: [{ $year: { $dateFromString: { dateString: "$date" } } }, 2024] }
     }
   },
+  { $unwind: "$lines" },
+
+  // Normalizacija valute u USD pre agregacije (fiksne, priblizne kursne stope)
   {
-    $sort: { avg_invoice: -1 }
-  },
-  {
-    $group: {
-      _id: null,
-      stores: { $push: { store_id: "$_id", avg_invoice: "$avg_invoice" } },
-      global_avg: { $avg: "$avg_invoice" }
-    }
-  },
-  {
-    $unwind: "$stores"
-  },
-  {
-    $project: {
-      _id: 0,
-      store_id: "$stores.store_id",
-      avg_invoice: "$stores.avg_invoice",
-      global_avg: 1,
-      difference: { $subtract: ["$stores.avg_invoice", "$global_avg"] },
-      status: {
-        $cond: {
-          if: { $gte: ["$stores.avg_invoice", "$global_avg"] },
-          then: "above average",
-          else: "below average"
-        }
+    $addFields: {
+      "lines.line_total_usd": {
+        $multiply: [
+          "$lines.line_total",
+          {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$currency", "USD"] }, then: 1 },
+                { case: { $eq: ["$currency", "EUR"] }, then: 1.08 },
+                { case: { $eq: ["$currency", "GBP"] }, then: 1.27 },
+                { case: { $eq: ["$currency", "CNY"] }, then: 0.14 }
+              ],
+              default: 1
+            }
+          }
+        ]
       }
     }
   },
+
+  {
+    $group: {
+      _id: "$store_id",
+      total_revenue: { $sum: "$lines.line_total_usd" },
+      avg_line_value: { $avg: "$lines.line_total_usd" },
+      total_lines: { $sum: 1 }
+    }
+  },
+  { $sort: { total_revenue: -1 } },
+  {
+    $group: {
+      _id: null,
+      stores: {
+        $push: {
+          store_id: "$_id",
+          total_revenue: "$total_revenue",
+          avg_line_value: "$avg_line_value",
+          total_lines: "$total_lines"
+        }
+      },
+      global_avg: { $avg: "$total_revenue" }
+    }
+  },
+  { $unwind: "$stores" },
   {
     $lookup: {
       from: "stores",
-      localField: "store_id",
+      localField: "stores.store_id",
       foreignField: "_id",
       as: "store_info"
     }
   },
   {
     $project: {
-      store_id: 1,
+      _id: 0,
+      store_id: "$stores.store_id",
       store_name: { $arrayElemAt: ["$store_info.store_name", 0] },
       city: { $arrayElemAt: ["$store_info.city", 0] },
       country: { $arrayElemAt: ["$store_info.country", 0] },
-      avg_invoice: 1,
-      global_avg: 1,
-      difference: 1,
-      status: 1
+      total_revenue: { $round: ["$stores.total_revenue", 2] },
+      avg_line_value: { $round: ["$stores.avg_line_value", 2] },
+      total_lines: "$stores.total_lines",
+      difference_from_avg: {
+        $round: [{ $subtract: ["$stores.total_revenue", "$global_avg"] }, 2]
+      },
+      status: {
+        $cond: {
+          if: { $gte: ["$stores.total_revenue", "$global_avg"] },
+          then: "above average",
+          else: "below average"
+        }
+      }
     }
   },
-  {
-    $sort: { avg_invoice: -1 }
-  }
+  { $sort: { total_revenue: -1 } }
 ])
 ```
 
 **Rezultat upita:**
 ![Rezultat upita1](1.query.png)
 
-*Prosecno vreme izvrsavanja: 4.29s*  
+*Prosecno vreme izvrsavanja: 14.10s*  
 
-
-### Upit 2: Top 10% kupaca po potrosnji sa dominantnim nacinom placanja. Identifikovati top 10% kupaca koji najvise trose i utvrditi koji nacin placanja dominira kod njih.
+### Upit 2: Kojih 20 kupaca je u 2024. godini imali najveći rast potrošnje u odnosu na 2023?
 
 ```javascript
 db.getCollection("invoices").aggregate([
   {
+    $match: { transaction_type: "Sale" }
+  },
+  {
     $group: {
       _id: {
         customer_id: "$customer.customer_id",
-        payment_method: "$payment_method"
+        year: { $year: { $dateFromString: { dateString: "$date" } } }
       },
-      total_spent: { $sum: "$invoice_total" },
       customer_name: { $first: "$customer.name" },
       customer_city: { $first: "$customer.city" },
-      customer_country: { $first: "$customer.country" }
+      customer_country: { $first: "$customer.country" },
+      total_spent: { $sum: "$invoice_total" }
     }
-  },
-  {
-    $sort: { total_spent: -1 }
   },
   {
     $group: {
@@ -96,15 +122,36 @@ db.getCollection("invoices").aggregate([
       customer_name: { $first: "$customer_name" },
       customer_city: { $first: "$customer_city" },
       customer_country: { $first: "$customer_country" },
-      dominant_payment: { $first: "$_id.payment_method" },
-      total_spent: { $sum: "$total_spent" }
+      yearly_data: {
+        $push: { year: "$_id.year", total_spent: "$total_spent" }
+      }
     }
   },
   {
-    $sort: { total_spent: -1 }
+    $project: {
+      customer_name: 1,
+      customer_city: 1,
+      customer_country: 1,
+      spent_2023: {
+        $sum: {
+          $map: {
+            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2023] } } },
+            as: "d", in: "$$d.total_spent"
+          }
+        }
+      },
+      spent_2024: {
+        $sum: {
+          $map: {
+            input: { $filter: { input: "$yearly_data", as: "d", cond: { $eq: ["$$d.year", 2024] } } },
+            as: "d", in: "$$d.total_spent"
+          }
+        }
+      }
+    }
   },
   {
-    $limit: 128370
+    $match: { spent_2023: { $gt: 0 }, spent_2024: { $gt: 0 } }
   },
   {
     $project: {
@@ -113,17 +160,30 @@ db.getCollection("invoices").aggregate([
       customer_name: 1,
       customer_city: 1,
       customer_country: 1,
-      dominant_payment: 1,
-      total_spent: { $round: ["$total_spent", 2] }
+      spent_2023: { $round: ["$spent_2023", 2] },
+      spent_2024: { $round: ["$spent_2024", 2] },
+      growth_percent: {
+        $round: [
+          {
+            $multiply: [
+              { $divide: [{ $subtract: ["$spent_2024", "$spent_2023"] }, "$spent_2023"] },
+              100
+            ]
+          }, 2
+        ]
+      }
     }
-  }
+  },
+  { $match: { growth_percent: { $gt: 0 } } },
+  { $sort: { growth_percent: -1 } },
+  { $limit: 20 }
 ])
 ```
 
 **Rezultat upita:**
 ![Rezultat upita2](2.query.png)
 
-*Prosecno vreme izvrsavanja: 62.33s*  
+*Prosecno vreme izvrsavanja: 43.09s*  
 
 ### Upit 3: Identifikovati koje prodavnice imaju najvise problema sa vracanjem robe i koja kategorija dominira u povracajima.
 
@@ -190,7 +250,7 @@ db.getCollection("invoices").aggregate([
 **Rezultat upita:**
 ![Rezultat upita3](3.query.png) 
 
-*Prosecno vreme izvrsavanja: 4.36s*  
+*Prosecno vreme izvrsavanja: 3.21s*  
 
 ### Upit 4: Prikazati koji gradovi pokazuju pad prihoda u Q4 (oktobar, novembar, decembar) u 2024. godini u odnosu na isti period 2023.
 
@@ -295,69 +355,34 @@ db.getCollection("invoices").aggregate([
 **Rezultat upita:**
 ![Rezultat upita4](4.query.png) 
 
-*Prosecno vreme izvrsavanja: 14.04s*  
+*Prosecno vreme izvrsavanja: 11.52s*  
 
-### Upit 5: Pronaci najboljeg radnika u svakoj prodavnici, koliko je zaradio i za koliko procenata je bolji od proseka prodavnice.
+
+### Upit 5: Koji su top 10 radnika po prihodu u decembru?
 
 ```javascript
 db.getCollection("invoices").aggregate([
   {
     $match: {
-      transaction_type: "Sale"
-    }
-  },
-  {
-    $group: {
-      _id: {
-        employee_id: "$employee_id",
-        store_id: "$store_id"
-      },
-      total_revenue: { $sum: "$invoice_total" },
-      total_invoices: { $sum: 1 }
-    }
-  },
-  {
-    $group: {
-      _id: "$_id.store_id",
-      store_avg_revenue: { $avg: "$total_revenue" },
-      best_employee: {
-        $top: {
-          sortBy: { total_revenue: -1 },
-          output: {
-            employee_id: "$_id.employee_id",
-            total_revenue: "$total_revenue",
-            total_invoices: "$total_invoices"
-          }
-        }
-      }
-    }
-  },
-  {
-    $project: {
-      _id: 0,
-      store_id: "$_id",
-      store_avg_revenue: { $round: ["$store_avg_revenue", 2] },
-      best_employee_id: "$best_employee.employee_id",
-      best_employee_revenue: { $round: ["$best_employee.total_revenue", 2] },
-      best_employee_invoices: "$best_employee.total_invoices",
-      percent_above_avg: {
-        $round: [
-          {
-            $multiply: [
-              {
-                $divide: [
-                  { $subtract: ["$best_employee.total_revenue", "$store_avg_revenue"] },
-                  "$store_avg_revenue"
-                ]
-              },
-              100
-            ]
-          },
-          2
+      transaction_type: "Sale",
+      $expr: {
+        $eq: [
+          { $month: { $dateFromString: { dateString: "$date" } } },
+          12
         ]
       }
     }
   },
+  {
+    $group: {
+      _id: "$employee_id",
+      store_id: { $first: "$store_id" },
+      total_revenue: { $sum: "$invoice_total" },
+      total_invoices: { $sum: 1 }
+    }
+  },
+  { $sort: { total_revenue: -1 } },
+  { $limit: 10 },
   {
     $lookup: {
       from: "stores",
@@ -368,24 +393,21 @@ db.getCollection("invoices").aggregate([
   },
   {
     $project: {
+      _id: 0,
+      employee_id: "$_id",
       store_id: 1,
       store_name: { $arrayElemAt: ["$store_info.store_name", 0] },
       city: { $arrayElemAt: ["$store_info.city", 0] },
       country: { $arrayElemAt: ["$store_info.country", 0] },
-      best_employee_id: 1,
-      best_employee_revenue: 1,
-      best_employee_invoices: 1,
-      store_avg_revenue: 1,
-      percent_above_avg: 1
+      total_revenue: { $round: ["$total_revenue", 2] },
+      total_invoices: 1
     }
   },
-  {
-    $sort: { percent_above_avg: -1 }
-  }
+  { $sort: { total_revenue: -1 } }
 ])
 ```
 
 **Rezultat upita:**
 ![Rezultat upita5](5.query.png) 
 
-*Prosecno vreme izvrsavanja: 5.61s*  
+*Prosecno vreme izvrsavanja: 7.06s*  
