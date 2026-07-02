@@ -64,7 +64,6 @@ db.invoice_lines_denorm.aggregate(
 
 db.invoice_lines_denorm.aggregate(
     [
-        // korak 1: jedinstvene fakture (jedan red po invoice_id)
         {
             $group: {
                 _id: "$invoice_id",
