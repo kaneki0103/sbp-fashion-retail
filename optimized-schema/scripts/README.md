@@ -8,7 +8,7 @@ Pre pokretanja skripti, potrebno je obezbediti podatke i instalirati potrebne Py
 
 Potrebne CSV datoteke možete preuzeti sa sledećeg linka: [Global Fashion Retail Stores Dataset na Kaggle-u](https://www.kaggle.com/datasets/ricgomes/global-fashion-retail-stores-dataset?select=products.csv)
 
-Sve preuzete `.csv` datoteke smestite u folder `data` unutar foldera `scripts` (isti direktorijum u kojem se nalaze ovaj `README.md` i `import_data.py`). Ukoliko folder `data` ne postoji (npr. jer je prazan pa nije komitovan na Git-u), potrebno je da ga sami napravite:
+Sve preuzete `.csv` datoteke smestite u folder `data` unutar foldera `scripts` (isti direktorijum u kojem se nalaze ovaj `README.md`, `import_data.py` i `import_optimized.py`). Ukoliko folder `data` ne postoji (npr. jer je prazan pa nije komitovan na Git-u), potrebno je da ga sami napravite:
 
 ```
 mkdir data
@@ -40,6 +40,7 @@ Primer preporučene strukture direktorijuma (folder `scripts`):
 scripts/
 ├── README.md
 ├── import_data.py
+├── import_optimized.py
 └── data/
     ├── customers.csv
     ├── discounts.csv
@@ -71,8 +72,14 @@ mkdir data
 
 3. Uverite se da su preuzeti `.csv` fajlovi smešteni u folder `data`.
 
-4. Pokrenite glavnu skriptu koja će učitati i obraditi podatke i popuniti bazu podataka.
+4. Pokrenite skriptu `import_data.py`.
 
 ```
 python import_data.py
+```
+
+5. Nakon što se prethodna skripta uspešno izvrši, pokrenite skriptu `import_optimized.py`.
+
+```
+python import_optimized.py
 ```
